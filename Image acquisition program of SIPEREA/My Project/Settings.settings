@@ -1,0 +1,84 @@
+﻿<?xml version='1.0' encoding='utf-8'?>
+<SettingsFile xmlns="http://schemas.microsoft.com/VisualStudio/2004/01/settings" CurrentProfile="(Default)" GeneratedClassNamespace="My" GeneratedClassName="MySettings" UseMySettingsClassName="true">
+  <Profiles />
+  <Settings>
+    <Setting Name="ImageURLs" Type="System.String" Scope="User">
+      <Value Profile="(Default)">http://192.168.0.100
+http://192.168.0.110
+http://192.168.0.111</Value>
+    </Setting>
+    <Setting Name="IsEverySecond" Type="System.Boolean" Scope="User">
+      <Value Profile="(Default)">False</Value>
+    </Setting>
+    <Setting Name="IsEveryMinute" Type="System.Boolean" Scope="User">
+      <Value Profile="(Default)">True</Value>
+    </Setting>
+    <Setting Name="IsEveryHour" Type="System.Boolean" Scope="User">
+      <Value Profile="(Default)">False</Value>
+    </Setting>
+    <Setting Name="IsUserDefined" Type="System.Boolean" Scope="User">
+      <Value Profile="(Default)">False</Value>
+    </Setting>
+    <Setting Name="IsEverySecondNumb" Type="System.String" Scope="User">
+      <Value Profile="(Default)">1</Value>
+    </Setting>
+    <Setting Name="IsEveryMinuteNumb" Type="System.String" Scope="User">
+      <Value Profile="(Default)">15</Value>
+    </Setting>
+    <Setting Name="IsEveryHourNumb" Type="System.String" Scope="User">
+      <Value Profile="(Default)">1</Value>
+    </Setting>
+    <Setting Name="IsUserDefinedText" Type="System.String" Scope="User">
+      <Value Profile="(Default)">00:00:00-24:00:00(01:00:00)
+07:00:00-20:00:00(00:15:00)</Value>
+    </Setting>
+    <Setting Name="AbortAfter" Type="System.String" Scope="User">
+      <Value Profile="(Default)">10</Value>
+    </Setting>
+    <Setting Name="IsContinuousCapture" Type="System.Boolean" Scope="User">
+      <Value Profile="(Default)">False</Value>
+    </Setting>
+    <Setting Name="IsContinuousCaptureNumb" Type="System.String" Scope="User">
+      <Value Profile="(Default)">20</Value>
+    </Setting>
+    <Setting Name="DestinationFolder" Type="System.String" Scope="User">
+      <Value Profile="(Default)">D:\My Temp\Test</Value>
+    </Setting>
+    <Setting Name="IsKeepFilesMonthly" Type="System.Boolean" Scope="User">
+      <Value Profile="(Default)">False</Value>
+    </Setting>
+    <Setting Name="FTPAddress" Type="System.String" Scope="User">
+      <Value Profile="(Default)">phenocapture.com</Value>
+    </Setting>
+    <Setting Name="FTPUserID" Type="System.String" Scope="User">
+      <Value Profile="(Default)">user2018@phenocapture.com</Value>
+    </Setting>
+    <Setting Name="FTPPass" Type="System.String" Scope="User">
+      <Value Profile="(Default)">jGq62f</Value>
+    </Setting>
+    <Setting Name="FTPTargetFolder" Type="System.String" Scope="User">
+      <Value Profile="(Default)">/monitor</Value>
+    </Setting>
+    <Setting Name="FTPPort" Type="System.String" Scope="User">
+      <Value Profile="(Default)">21</Value>
+    </Setting>
+    <Setting Name="IsUseSSL" Type="System.Boolean" Scope="User">
+      <Value Profile="(Default)">False</Value>
+    </Setting>
+    <Setting Name="IsSaveImage" Type="System.Boolean" Scope="User">
+      <Value Profile="(Default)">True</Value>
+    </Setting>
+    <Setting Name="IsUploadToFTP" Type="System.Boolean" Scope="User">
+      <Value Profile="(Default)">False</Value>
+    </Setting>
+    <Setting Name="Baudrate" Type="System.String" Scope="User">
+      <Value Profile="(Default)">256000</Value>
+    </Setting>
+    <Setting Name="TargetDevice" Type="System.String" Scope="User">
+      <Value Profile="(Default)">T3</Value>
+    </Setting>
+    <Setting Name="Illumination" Type="System.Boolean" Scope="User">
+      <Value Profile="(Default)">True</Value>
+    </Setting>
+  </Settings>
+</SettingsFile>
