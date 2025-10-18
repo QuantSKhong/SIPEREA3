@@ -1,0 +1,4 @@
+﻿Condition1,Condition2,Date,Plate#,Well#,Shape,X1,Y1,X2,Y2
+Batch1,,,1,,circle,236,627,736,1128
+Batch1,,,2,,circle,864,605,1394,1109
+Batch1,,,3,,circle,530,45,1048,556

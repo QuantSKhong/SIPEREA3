@@ -1,0 +1,23 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.14.36109.1 d17.14
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{888888A0-9F3D-457C-B088-3A5042F75D52}") = "SIPEREAImageAnalyzer", "SIPEREAImageAnalyzer.pyproj", "{61E0143E-DB18-47E8-892C-187CD54E1D90}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{61E0143E-DB18-47E8-892C-187CD54E1D90}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{61E0143E-DB18-47E8-892C-187CD54E1D90}.Release|Any CPU.ActiveCfg = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {E1774559-2D97-4AD9-90BC-ECAC5C67D6C3}
+	EndGlobalSection
+EndGlobal
