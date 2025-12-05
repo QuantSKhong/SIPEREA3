@@ -1,9 +1,50 @@
-﻿# Last Modified: 2025-06-27c
+﻿# Last Modified: 2025-06-27d
 
 # === Standard Library Imports ===
 import os
 import sys
+import importlib.util
 import subprocess
+
+# TensorFlow 로그 레벨(선택)
+os.environ.setdefault('TF_CPP_MIN_LOG_LEVEL', '2')
+
+def ensure_packages(packages):
+    """
+    packages: dict of pip_name -> import_name (module or top-level package)
+    """
+    missing = []
+    for pip_name, import_name in packages.items():
+        if import_name is None:
+            # skip packages that can't be imported by name (rare)
+            continue
+        spec = importlib.util.find_spec(import_name)
+        if spec is None:
+            missing.append(pip_name)
+
+    if not missing:
+        return
+
+    print(f"Installing missing packages: {', '.join(missing)}")
+    for pkg in missing:
+        subprocess.check_call([sys.executable, "-m", "pip", "install", pkg])
+    print("Package installation finished. Continuing startup...")
+
+# pip package -> import root name
+_required_packages = {
+    "tensorflow": "tensorflow",
+    "scikit-learn": "sklearn",
+    "opencv-python": "cv2",
+    "numpy": "numpy",
+    "pandas": "pandas",
+    "matplotlib": "matplotlib",
+    "pillow": "PIL"
+    # tkinter는 시스템 패키지이므로 pip로 설치하지 않습니다
+}
+
+ensure_packages(_required_packages)
+
+# 이제 서드파티 임포트 안전하게 수행
 import glob
 import csv
 import datetime
@@ -16,7 +57,6 @@ import queue
 import time
 from threading import Thread
 
-# === Third-Party Library Imports ===
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -45,44 +85,13 @@ from sklearn.model_selection import train_test_split
 import tkinter as tk
 from tkinter import filedialog, ttk
 
-# === Unused/Unusual Imports (should be reviewed for necessity) ===
-from ast import IsNot
-import pkg_resources
+# 전역 변수
 isStop = False
 
 try:
     ctypes.windll.shcore.SetProcessDpiAwareness(1)
 except:
     pass
-
-
-def install_required_packages():
-    required_packages = {
-        'tensorflow': 'tensorflow',
-        'scikit-learn': 'sklearn',
-        'opencv-python': 'cv2',
-        'numpy': 'numpy',
-        'matplotlib': 'matplotlib.pyplot',
-        'pillow': 'PIL',
-        'tk': 'tkinter'
-    }
-    
-    missing_packages = []
-    
-    for package, import_name in required_packages.items():
-        try:
-            __import__(import_name.split('.')[0])
-        except ImportError:
-            missing_packages.append(package)
-    
-    if missing_packages:
-        print(f"Installing missing packages: {', '.join(missing_packages)}")
-        for package in missing_packages:
-            subprocess.check_call([sys.executable, "-m", "pip", "install", package])
-        print("All required packages have been installed.")
-        
-# Install required packages if not already installed
-install_required_packages()
 
 class SIPEREAImageAnalyzer(tk.Tk):
     def __init__(self):
@@ -390,20 +399,18 @@ class ImageAnalysisTab(ttk.Frame):
         self.check_analysis_progress()
 
     def run_analysis(self, input_folder, output_folder, viz_folder):
+        analysis_start_time = time.time()  # 분석 시작 시간 기록
+        
         try:
-            # Verify paths
             if not input_folder or not os.path.isdir(input_folder):
                 raise ValueError("Invalid input folder path")
 
-            # Load ROI data
             self.read_roi_data(input_folder)
             self.first_image_time = None
 
-            # Prepare result file path
             result_path = os.path.join(input_folder, 'resultArea.csv')
-            is_first_result = True  # 첫 번째 이미지인지 여부 플래그
+            is_first_result = True
 
-            # Initialize binarizer model
             img_height, img_width = 512, 512
             binarizer = DuckweedBinarizer(img_height=img_height, img_width=img_width)
             binarizer.build_model()
@@ -421,11 +428,9 @@ class ImageAnalysisTab(ttk.Frame):
                     print("Paused by user. Processing stopped")
                     return
 
-                # Display current image file in status bar
                 current_file = os.path.basename(img_path)
                 self.status_bar.config(text=f"Image {idx}/{len(self.image_files)}: {current_file}")
 
-                # Process image
                 binary_result = ProcessImage(
                     img_path,
                     output_folder,
@@ -445,6 +450,18 @@ class ImageAnalysisTab(ttk.Frame):
                         is_first_result = False
 
                 plt.close('all')
+
+            # Calculate and display total analysis time
+            analysis_end_time = time.time()
+            total_seconds = analysis_end_time - analysis_start_time
+            hours = int(total_seconds // 3600)
+            minutes = int((total_seconds % 3600) // 60)
+            seconds = int(total_seconds % 60)
+            
+            print(f"\n{'='*60}")
+            print(f"Total analysis time: {hours}h {minutes}m {seconds}s")
+            print(f"Analyzed {len(self.image_files)} images")
+            print(f"{'='*60}\n")
 
             self.message_queue.put(("completed", None))
         except Exception as e:
@@ -600,7 +617,7 @@ class ImageAnalysisTab(ttk.Frame):
                 # Compute the scroll amount
                 x_move = -delta_x / visible_width
                 y_move = -delta_y / visible_height
-                
+                        
                 # Move the canvas view
                 self.canvas.xview_moveto(self.canvas.xview()[0] + x_move)
                 self.canvas.yview_moveto(self.canvas.yview()[0] + y_move)
@@ -978,24 +995,28 @@ class TrainingTab(ttk.Frame):
                 batch_size=2,
                 should_stop=lambda: self.should_stop,
                 es_patience=es_patience,
-                lr_patience=lr_patience
+                lr_patience=lr_patience,
+                use_kfold=True,
+                k_folds=5
             )
-        
 
-            # Record training end time and calculate elapsed time
+            # Calculate and display total training time
             training_end_time = time.time()
-            elapsed_time = training_end_time - self.training_start_time
-            print(f"Training completed in {elapsed_time:.2f} s")
-
+            total_seconds = training_end_time - self.training_start_time
+            hours = int(total_seconds // 3600)
+            minutes = int((total_seconds % 3600) // 60)
+            seconds = int(total_seconds % 60)
+            
+            print(f"\n{'='*60}")
+            print(f"Total training time: {hours}h {minutes}m {seconds}s")
+            print(f"{'='*60}\n")
 
             # Early stopping or normal completion
             if history is not None and not self.should_stop:
                 print("Training completed. Starting prediction...")
             
-                # Save trained model
                 binarizer.save_model('bestTrained_Model.keras')
                 print("'bestTrained_Model.keras' saved")
-            
 
                 os.makedirs(output_folder, exist_ok=True)
 
@@ -1008,7 +1029,6 @@ class TrainingTab(ttk.Frame):
                     output_path = os.path.join(output_folder, filename)
                     print(f"Predicting and saving binary mask for: {filename}")
 
-                    # Predict binary mask
                     binary_prediction = binarizer.predict(
                         img_path,
                         save_path=viz_folder,
@@ -1016,12 +1036,9 @@ class TrainingTab(ttk.Frame):
                         save_enhanced=self.save_enhanced_var.get()
                     )
 
-                    # Save binary mask to output folder
                     cv2.imwrite(output_path, binary_prediction)
 
                 print(f"Binary images generated and saved to: {output_folder}")
-
-
 
                 # Run predictions on validation data for ROC-AUC analysis
                 print("Performing ROC-AUC analysis...")
@@ -1035,32 +1052,18 @@ class TrainingTab(ttk.Frame):
                 roc_auc = auc(fpr, tpr)
                 print(f"ROC-AUC: {roc_auc:.4f}")
 
-                # Save ROC-AUC raw data to CSV
-                roc_data = pd.DataFrame({
-                    'False positive rate': fpr,
-                    'True positive rate': tpr,
-                    'Thresholds': thresholds
-                })
-                #roc_data_path = os.path.join(output_folder, "roc_auc_data.csv")
-                #roc_data.to_csv(roc_data_path, index=False)
-                #print(f"ROC-AUC data saved to {roc_data_path}")
-
-                # Save ROC-AUC raw data to CSV (with sampling)
+                # Save ROC-AUC data (sampled)
                 sampled_indices = np.linspace(0, len(fpr) - 1, num=1000, dtype=int)
-                fpr_sampled = fpr[sampled_indices]
-                tpr_sampled = tpr[sampled_indices]
-                thresholds_sampled = thresholds[sampled_indices]
-
                 roc_data_sampled = pd.DataFrame({
-                    'False positive rate': fpr_sampled,
-                    'True positive rate': tpr_sampled,
-                    'Thresholds': thresholds_sampled
+                    'False positive rate': fpr[sampled_indices],
+                    'True positive rate': tpr[sampled_indices],
+                    'Thresholds': thresholds[sampled_indices]
                 })
                 roc_data_path = os.path.join(output_folder, "roc_auc_data_sampled.csv")
                 roc_data_sampled.to_csv(roc_data_path, index=False)
                 print(f"Sampled ROC-AUC data saved to {roc_data_path}")
 
-                # Save ROC-AUC plot to PNG
+                # Save ROC-AUC plot
                 plt.figure()
                 plt.plot(fpr, tpr, color='darkorange', lw=2, label=f'ROC curve (area = {roc_auc:.4f})')
                 plt.plot([0, 1], [0, 1], color='navy', lw=2, linestyle='--')
@@ -1072,36 +1075,25 @@ class TrainingTab(ttk.Frame):
                 plt.savefig(roc_plot_path)
                 plt.close()
                 print(f"ROC-AUC plot saved to {roc_plot_path}")
-                   
 
                 # Compute segmentation metrics
-                # 1. Binarize predictions and ground truth
                 y_pred_bin = (y_pred > 0.5).astype(np.uint8)
                 y_true_bin = y_true.astype(np.uint8)
 
-                # 2. Pixel Accuracy
                 pixel_accuracy = accuracy_score(y_true_bin, y_pred_bin)
-
-                # 3. IoU (Jaccard)
                 intersection = np.logical_and(y_true_bin, y_pred_bin).sum()
                 union = np.logical_or(y_true_bin, y_pred_bin).sum()
                 iou = intersection / union if union > 0 else 0.0
-
-                # 4. Dice Coefficient
                 dice = (2 * intersection) / (y_true_bin.sum() + y_pred_bin.sum()) if (y_true_bin.sum() + y_pred_bin.sum()) > 0 else 0.0
-
-                # 5. Precision, Recall
                 precision = precision_score(y_true_bin, y_pred_bin, zero_division=0)
                 recall = recall_score(y_true_bin, y_pred_bin, zero_division=0)
 
-                # 6. Save segmentation metrics to console
                 print(f"Pixel Accuracy: {pixel_accuracy:.4f}")
                 print(f"IoU (Jaccard): {iou:.4f}")
                 print(f"Dice Coefficient: {dice:.4f}")
                 print(f"Precision: {precision:.4f}")
                 print(f"Recall: {recall:.4f}")
 
-                # 7. Save segmentation metrics to CSV
                 metrics_df = pd.DataFrame([{
                     "Pixel Accuracy": pixel_accuracy,
                     "IoU": iou,
@@ -1119,35 +1111,25 @@ class TrainingTab(ttk.Frame):
                 print("Confusion Matrix:")
                 print(cm)
 
-                # Convert confusion matrix to DataFrame for better visualization
                 cm_df = pd.DataFrame(
                     cm,
                     index=["True Negative", "True Positive"],
                     columns=["Predicted Negative", "Predicted Positive"]
                 )
-
-                # Save confusion matrix to CSV
                 cm_path = os.path.join(output_folder, "confusion_matrix.csv")
                 cm_df.to_csv(cm_path)
                 print(f"Confusion matrix saved to {cm_path}")
                 
                 print("\n[INFO] Training analysis completed!")
-                               
- 
-            # Close any remaining figures
+
             plt.close('all')
-    
-            # Send completion message
             self.message_queue.put(("completed", None))
 
         except Exception as e:
-            # Send error message
             self.message_queue.put(("error", str(e)))
         finally:
-            # Restore stdout
             sys.stdout = self.original_stdout
             plt.close('all')
-            print("\n[INFO] Training analysis completed!")
 
     # Check training progress and update UI
     def check_training_progress(self):
@@ -1316,77 +1298,244 @@ class DuckweedBinarizer:
 
         return np.array(X), np.array(y)
 
-    def train(self, image_paths, mask_paths, validation_split=0.2, epochs=100, batch_size=8, should_stop=lambda: False, es_patience=30, lr_patience=10):
+    def train(self, image_paths, mask_paths, validation_split=0.2, epochs=100, batch_size=8, 
+              should_stop=lambda: False, es_patience=30, lr_patience=10, use_kfold=False, k_folds=5):
+        """
+        Train the model with optional k-fold cross validation
+        
+        Parameters:
+        -----------
+        use_kfold : bool
+            Whether to use k-fold cross validation (default: False)
+        k_folds : int
+            Number of folds for cross-validation (default: 5)
+        """
         if self.model is None:
             self.build_model()
 
         with tf.device('/CPU:0'):
             X, y = self.prepare_training_data(image_paths, mask_paths)
 
-            from tensorflow.keras.preprocessing.image import ImageDataGenerator
-
-            seed = 42
-            data_gen_args = dict(
-                rotation_range=15,
-                width_shift_range=0.1,
-                height_shift_range=0.1,
-                shear_range=0.05,
-                zoom_range=[0.9, 1.1],
-                horizontal_flip=True,
-                fill_mode='nearest')
-
-            image_datagen = ImageDataGenerator(**data_gen_args)
-            mask_datagen = ImageDataGenerator(**data_gen_args)
-
-            X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=validation_split, random_state=seed)
-            print(f"Spliting data sets: Training Count = {X_train.shape[0]}, Validation Count = {X_val.shape[0]}")
-
-            image_generator = image_datagen.flow(X_train, batch_size=batch_size, seed=seed)
-            mask_generator = mask_datagen.flow(y_train, batch_size=batch_size, seed=seed)
-
-            def train_generator():
-                while True:
-                    if should_stop(): 
-                        raise StopIteration("Training stopped by user")
-                    X_batch = next(image_generator)
-                    y_batch = next(mask_generator)
-                    yield X_batch, y_batch
-
-            train_steps = (len(X_train) + batch_size - 1) // batch_size
-
-            callbacks = [
-                EarlyStopping(monitor='val_loss', patience=es_patience, restore_best_weights=True, verbose=1),
-                ModelCheckpoint('current_Best_Model.keras', monitor='val_loss', save_best_only=True, verbose=1),
-                ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=lr_patience, min_lr=1e-6, verbose=1),
-                StopTrainingCallback(should_stop) 
-            ]
-
-            try:
-                history = self.model.fit(
-                    train_generator(),
-                    steps_per_epoch=train_steps,
-                    validation_data=(X_val, y_val),
-                    epochs=epochs,
-                    callbacks=callbacks,
-                    verbose=1
+            # K-fold cross validation
+            if use_kfold:
+                from sklearn.model_selection import KFold
+                
+                kf = KFold(n_splits=k_folds, shuffle=True, random_state=42)
+                fold_histories = []
+                fold_metrics = []
+                
+                for fold, (train_idx, val_idx) in enumerate(kf.split(X)):
+                    print(f"\n--------- Training Fold {fold+1}/{k_folds} ---------")
+                    
+                    # Reset model for each fold
+                    tf.keras.backend.clear_session()
+                    self.build_model()
+                    
+                    # Split data for this fold
+                    X_train, X_val = X[train_idx], X[val_idx]
+                    y_train, y_val = y[train_idx], y[val_idx]
+                    print(f"Fold {fold+1} split: Training = {len(X_train)}, Validation = {len(X_val)}")
+                    
+                    # Train this fold
+                    history = self._train_single_fold(
+                        X_train, y_train, X_val, y_val,
+                        epochs, batch_size, should_stop, 
+                        es_patience, lr_patience, fold
+                    )
+                    
+                    if history is None:  # Training stopped by user
+                        break
+                    
+                    # Evaluate model on validation data
+                    val_loss, val_accuracy = self.model.evaluate(X_val, y_val, verbose=1)
+                    fold_metrics.append({
+                        'fold': fold+1,
+                        'val_loss': val_loss,
+                        'val_accuracy': val_accuracy
+                    })
+                    
+                    fold_histories.append(history)
+                    self.model.save(f'model_fold_{fold+1}.keras')
+                    print(f"Model for fold {fold+1} saved")
+                
+                # Summarize results
+                if fold_metrics:
+                    self._summarize_kfold_results(fold_metrics, fold_histories)
+                    return fold_histories
+                else:
+                    print("Training stopped prematurely.")
+                    return None
+                    
+            # Standard train-validation split
+            else:
+                X_train, X_val, y_train, y_val = train_test_split(
+                    X, y, test_size=validation_split, random_state=42
                 )
-            except StopIteration:
-                print("\nTraining paused by user")
-                return None
+                print(f"Split: Training = {X_train.shape[0]}, Validation = {X_val.shape[0]}")
+                
+                history = self._train_single_fold(
+                    X_train, y_train, X_val, y_val,
+                    epochs, batch_size, should_stop,
+                    es_patience, lr_patience, fold=None
+                )
+                
+                if history is not None:
+                    self._plot_training_history(history)
+                    self.model.save('current_Best_Model.keras')
+                    self.model = load_model('current_Best_Model.keras')
+                
+                return history
 
-            self._plot_training_history(history)
+    def _train_single_fold(self, X_train, y_train, X_val, y_val, epochs, batch_size, 
+                          should_stop, es_patience, lr_patience, fold=None):
+        """Train a single fold or standard training"""
+        from tensorflow.keras.preprocessing.image import ImageDataGenerator
+        
+        seed = 42
+        data_gen_args = dict(
+            rotation_range=15,
+            width_shift_range=0.1,
+            height_shift_range=0.1,
+            shear_range=0.05,
+            zoom_range=[0.9, 1.1],
+            horizontal_flip=True,
+            fill_mode='nearest'
+        )
+
+        image_datagen = ImageDataGenerator(**data_gen_args)
+        mask_datagen = ImageDataGenerator(**data_gen_args)
+        
+        image_generator = image_datagen.flow(X_train, batch_size=batch_size, seed=seed)
+        mask_generator = mask_datagen.flow(y_train, batch_size=batch_size, seed=seed)
+        
+        def train_generator():
+            while True:
+                if should_stop(): 
+                    raise StopIteration("Training stopped by user")
+                X_batch = next(image_generator)
+                y_batch = next(mask_generator)
+                yield X_batch, y_batch
+        
+        train_steps = (len(X_train) + batch_size - 1) // batch_size
+        
+        model_name = f'model_fold_{fold+1}.keras' if fold is not None else 'current_Best_Model.keras'
+        
+        # Custom callback to track epoch timing and add fold info
+        class EpochTimingCallback(Callback):
+            def __init__(self, fold_number=None):
+                super().__init__()
+                self.fold_number = fold_number
+                self.epoch_times = []
+                
+            def on_epoch_begin(self, epoch, logs=None):
+                self.epoch_start_time = time.time()
+                fold_prefix = f"[Fold {self.fold_number}] " if self.fold_number is not None else ""
+                print(f"\n{fold_prefix}Epoch {epoch + 1}/{self.params['epochs']}")
+                
+            def on_epoch_end(self, epoch, logs=None):
+                epoch_duration = time.time() - self.epoch_start_time
+                self.epoch_times.append({
+                    'epoch': epoch + 1,
+                    'start_time': datetime.fromtimestamp(self.epoch_start_time).strftime('%Y-%m-%d %H:%M:%S'),
+                    'duration_seconds': epoch_duration
+                })
+        
+        epoch_timer = EpochTimingCallback(fold_number=(fold+1) if fold is not None else None)
+        
+        callbacks = [
+            epoch_timer,
+            EarlyStopping(monitor='val_loss', patience=es_patience, restore_best_weights=True, verbose=1),
+            ModelCheckpoint(model_name, monitor='val_loss', save_best_only=True, verbose=1),
+            ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=lr_patience, min_lr=1e-6, verbose=1),
+            StopTrainingCallback(should_stop)
+        ]
+        
+        try:
+            history = self.model.fit(
+                train_generator(),
+                steps_per_epoch=train_steps,
+                validation_data=(X_val, y_val),
+                epochs=epochs,
+                callbacks=callbacks,
+                verbose=1
+            )
             
-            # Save current_Best_Model.keras after training
-            self.model.save('current_Best_Model.keras')
-            # Load the best model after training
-            self.model = load_model('current_Best_Model.keras')
-            
+            # Store epoch timing info in history
+            history.epoch_times = epoch_timer.epoch_times
             return history
+        except StopIteration:
+            print("\nTraining paused by user")
+            return None
+
+    def _summarize_kfold_results(self, fold_metrics, fold_histories):
+        """Summarize k-fold results and save per-fold and combined CSVs with timing info."""
+        # Save fold-level summary metrics
+        summary_df = pd.DataFrame(fold_metrics)
+        summary_csv = 'cross_validation_fold_metrics.csv'
+        summary_df.to_csv(summary_csv, index=False)
+        print(f"Fold metrics saved to '{summary_csv}'")
+
+        # Save each fold's epoch history with timing information
+        combined_df = None
+        for i, history in enumerate(fold_histories):
+            fold_idx = i + 1
+            h = history.history
+            epochs = list(range(1, len(h.get('loss', [])) + 1))
+            
+            # Prepare timing data if available
+            epoch_times = getattr(history, 'epoch_times', [])
+            start_times = [et['start_time'] for et in epoch_times] if epoch_times else [''] * len(epochs)
+            durations = [et['duration_seconds'] for et in epoch_times] if epoch_times else [np.nan] * len(epochs)
+
+            fold_df = pd.DataFrame({
+                'epoch': epochs,
+                'epoch_start_time': start_times,
+                'epoch_duration_sec': durations,
+                f'fold{fold_idx}_train_loss': h.get('loss', [np.nan] * len(epochs)),
+                f'fold{fold_idx}_val_loss': h.get('val_loss', [np.nan] * len(epochs)),
+                f'fold{fold_idx}_train_accuracy': h.get('accuracy', [np.nan] * len(epochs)),
+                f'fold{fold_idx}_val_accuracy': h.get('val_accuracy', [np.nan] * len(epochs)),
+            })
+
+            fold_csv = f'cross_validation_fold_{fold_idx}.csv'
+            fold_df.to_csv(fold_csv, index=False)
+            print(f"Fold {fold_idx} history saved to '{fold_csv}'")
+
+            # For combined CSV, use only core training metrics
+            fold_df_simple = pd.DataFrame({
+                'epoch': epochs,
+                f'fold{fold_idx}_train_loss': h.get('loss', [np.nan] * len(epochs)),
+                f'fold{fold_idx}_val_loss': h.get('val_loss', [np.nan] * len(epochs)),
+                f'fold{fold_idx}_train_accuracy': h.get('accuracy', [np.nan] * len(epochs)),
+                f'fold{fold_idx}_val_accuracy': h.get('val_accuracy', [np.nan] * len(epochs)),
+            })
+
+            if combined_df is None:
+                combined_df = fold_df_simple.copy()
+            else:
+                combined_df = pd.merge(combined_df, fold_df_simple, on='epoch', how='outer')
+
+        # Save combined history
+        if combined_df is not None:
+            combined_csv = 'cross_validation_all_folds_history.csv'
+            combined_df.to_csv(combined_csv, index=False)
+            print(f"Combined cross-validation history saved to '{combined_csv}'")
+
+        # Generate PNG plot
+        try:
+            self._plot_cross_validation_history(fold_histories)
+        except Exception as e:
+            print(f"Warning: plotting cross-validation history failed: {e}")
 
     def _plot_training_history(self, history):
-        # Save training history to CSV
+        """Plot and save training history for single-fold training."""
+        # Save epoch timing data if available
+        epoch_times = getattr(history, 'epoch_times', [])
+        
         history_df = pd.DataFrame({
             'epoch': range(1, len(history.history['loss']) + 1),
+            'epoch_start_time': [et['start_time'] for et in epoch_times] if epoch_times else [''] * len(history.history['loss']),
+            'epoch_duration_sec': [et['duration_seconds'] for et in epoch_times] if epoch_times else [np.nan] * len(history.history['loss']),
             'training_loss': history.history['loss'],
             'validation_loss': history.history['val_loss'],
             'training_accuracy': history.history['accuracy'],
@@ -1494,7 +1643,7 @@ class DuckweedBinarizer:
                             for k in range(overlap):
                                 # Reduce the weight for top and bottom edges
                                 weight[k, :] = weight[k, :] * (k + 1) / (overlap + 1)
-                                weight[tile_size - 1 - k, :] = weight[tile_size - 1 - k, :] * (k + 1) / (overlap + 1)
+                                weight[tile_size - 1 - k, :] = weight[tile_size - 1 - k] * (k + 1) / (overlap + 1)
                         
                                 # Reduce the weight for left and right edges 
                                 weight[:, k] = weight[:, k] * (k + 1) / (overlap + 1)
@@ -1540,7 +1689,7 @@ class DuckweedBinarizer:
         plt.axis('off')
         
         filename = os.path.basename(image_path)
-        base_name = os.path.splitext(filename)[0]
+        base_name = os.path.splitext(filename)[0];
         
         plt.tight_layout()
         output_path = os.path.join(save_path, f'visualization_{base_name}.png') if save_path else f'visualization_{base_name}.png'
@@ -1554,7 +1703,7 @@ class DuckweedBinarizer:
         plt.figure(figsize=(15, 5))
         
         filename = os.path.basename(image_path)
-        base_name = os.path.splitext(filename)[0]
+        base_name = os.path.splitext(filename)[0];
         
         plt.subplot(1, 3, 1)
         plt.imshow(original_img)
@@ -1759,183 +1908,6 @@ class StopTrainingCallback(Callback):
             print(f"\nProcessing paused by user")
             self.model.stop_training = True
 
-
-
 if __name__ == "__main__":
     app = SIPEREAImageAnalyzer()
-    def train(self, image_paths, mask_paths, validation_split=0.2, epochs=100, batch_size=8, should_stop=lambda: False, es_patience=30, lr_patience=10, k_folds=5):
-        """
-        Train the model with k-fold cross validation
-        
-        Parameters:
-        -----------
-        image_paths : list
-            List of paths to training images
-        mask_paths : list
-            List of paths to corresponding mask images
-        validation_split : float
-            Fraction of data to use for validation when not using cross-validation
-        epochs : int
-            Maximum number of training epochs
-        batch_size : int
-            Batch size for training
-        should_stop : callable
-            Function that returns True if training should be stopped
-        es_patience : int
-            Patience for early stopping
-        lr_patience : int
-            Patience for learning rate reduction
-        k_folds : int
-            Number of folds for cross-validation (default: 5)
-        """
-        from sklearn.model_selection import KFold
-        
-        if self.model is None:
-            self.build_model()
-        
-        with tf.device('/CPU:0'):
-            X, y = self.prepare_training_data(image_paths, mask_paths)
-            
-            # Initialize K-fold cross-validation
-            kf = KFold(n_splits=k_folds, shuffle=True, random_state=42)
-            fold_histories = []
-            fold_metrics = []
-            
-            # Perform k-fold cross-validation
-            for fold, (train_idx, val_idx) in enumerate(kf.split(X)):
-                print(f"\n--------- Training Fold {fold+1}/{k_folds} ---------")
-                
-                # Reset model for each fold
-                tf.keras.backend.clear_session()
-                self.build_model()
-                
-                # Split data for this fold
-                X_train, X_val = X[train_idx], X[val_idx]
-                y_train, y_val = y[train_idx], y[val_idx]
-                print(f"Fold {fold+1} split: Training images = {len(X_train)}, Validation images = {len(X_val)}")
-                
-                # Setup data augmentation
-                seed = 42
-                data_gen_args = dict(
-                    rotation_range=15,
-                    width_shift_range=0.1,
-                    height_shift_range=0.1,
-                    shear_range=0.05,
-                    zoom_range=[0.9, 1.1],
-                    horizontal_flip=True,
-                    fill_mode='nearest')
-
-                image_datagen = ImageDataGenerator(**data_gen_args)
-                mask_datagen = ImageDataGenerator(**data_gen_args)
-                
-                image_generator = image_datagen.flow(X_train, batch_size=batch_size, seed=seed)
-                mask_generator = mask_datagen.flow(y_train, batch_size=batch_size, seed=seed)
-                
-                def train_generator():
-                    while True:
-                        if should_stop(): 
-                            raise StopIteration("Training stopped by user")
-                        X_batch = next(image_generator)
-                        y_batch = next(mask_generator)
-                        yield X_batch, y_batch
-                        
-                train_steps = (len(X_train) + batch_size - 1) // batch_size
-                
-                # Setup callbacks
-                callbacks = [
-                    EarlyStopping(monitor='val_loss', patience=es_patience, restore_best_weights=True, verbose=1),
-                    ModelCheckpoint(f'model_fold_{fold+1}.keras', monitor='val_loss', save_best_weights=True, verbose=1),
-                    ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=lr_patience, min_lr=1e-6, verbose=1),
-                    StopTrainingCallback(should_stop)
-                ]
-                
-                try:
-                    # Train model for this fold
-                    history = self.model.fit(
-                        train_generator(),
-                        steps_per_epoch=train_steps,
-                        validation_data=(X_val, y_val),
-                        epochs=epochs,
-                        callbacks=callbacks,
-                        verbose=1
-                    )
-                    
-                    # Evaluate model on validation data
-                    val_loss, val_accuracy = self.model.evaluate(X_val, y_val, verbose=1)
-                    fold_metrics.append({
-                        'fold': fold+1,
-                        'val_loss': val_loss,
-                        'val_accuracy': val_accuracy
-                    })
-                    
-                    # Store history and model for this fold
-                    fold_histories.append(history)
-                    self.model.save(f'model_fold_{fold+1}.keras')
-                    print(f"Model for fold {fold+1} saved as 'model_fold_{fold+1}.keras'")
-                    
-                except StopIteration:
-                    print(f"\nTraining stopped by user during fold {fold+1}")
-                    break
-                    
-            # Summarize cross-validation results
-            if fold_metrics:
-                print("\n========== Cross-Validation Results ==========")
-                for metric in fold_metrics:
-                    print(f"Fold {metric['fold']}: Loss = {metric['val_loss']:.4f}, Accuracy = {metric['val_accuracy']:.4f}")
-                    
-                # Calculate average metrics
-                avg_val_loss = np.mean([m['val_loss'] for m in fold_metrics])
-                avg_val_accuracy = np.mean([m['val_accuracy'] for m in fold_metrics])
-                print(f"\nAverage: Loss = {avg_val_loss:.4f}, Accuracy = {avg_val_accuracy:.4f}")
-                
-                # Find best fold
-                best_fold_idx = np.argmin([m['val_loss'] for m in fold_metrics])
-                best_fold = fold_metrics[best_fold_idx]['fold']
-                print(f"Best fold: {best_fold} with Loss = {fold_metrics[best_fold_idx]['val_loss']:.4f}")
-                
-                # Load the best model
-                self.model = load_model(f'model_fold_{best_fold}.keras')
-                print(f"Loaded best model from fold {best_fold}")
-                
-                # Save as final model
-                self.model.save('bestTrained_Model.keras')
-                print("Best model saved as 'bestTrained_Model.keras'")
-                
-                # Plot combined training history
-                self._plot_cross_validation_history(fold_histories)
-                
-                return fold_histories
-            else:
-                print("No complete fold training available. Training was stopped prematurely.")
-                return None
-
-    def _plot_cross_validation_history(self, fold_histories):
-        """Plot the training history across all folds"""
-        plt.figure(figsize=(15, 6))
-        
-        # Plot loss
-        plt.subplot(1, 2, 1)
-        for i, history in enumerate(fold_histories):
-            plt.plot(history.history['loss'], label=f'Train Loss (Fold {i+1})', alpha=0.7)
-            plt.plot(history.history['val_loss'], label=f'Val Loss (Fold {i+1})', linestyle='--', alpha=0.7)
-        plt.title('Loss Over Epochs (All Folds)')
-        plt.xlabel('Epoch')
-        plt.ylabel('Loss')
-        plt.legend()
-        
-        # Plot accuracy
-        plt.subplot(1, 2, 2)
-        for i, history in enumerate(fold_histories):
-            plt.plot(history.history['accuracy'], label=f'Train Acc (Fold {i+1})', alpha=0.7)
-            plt.plot(history.history['val_accuracy'], label=f'Val Acc (Fold {i+1})', linestyle='--', alpha=0.7)
-        plt.title('Accuracy Over Epochs (All Folds)')
-        plt.xlabel('Epoch')
-        plt.ylabel('Accuracy')
-        plt.legend()
-        
-        plt.tight_layout()
-        plt.savefig('cross_validation_history.png')
-        plt.close()
-        
-        print("Cross-validation history plot saved as 'cross_validation_history.png'")
-    app.mainloop()  
+    app.mainloop()
